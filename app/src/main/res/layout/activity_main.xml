@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Título -->
+
+        <TextView
+            android:id="@+id/txtTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Aquisição de Dados - ESP32"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="15dp" />
+
+        <!-- Status -->
+
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Desconectado"
+            android:textSize="16sp"
+            android:gravity="center"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Tensão -->
+
+        <TextView
+            android:id="@+id/txtVoltage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="0.000 V"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="10dp" />
+
+        <!-- ADC -->
+
+        <TextView
+            android:id="@+id/txtADC"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ADC: 0"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Frequência -->
+
+        <TextView
+            android:id="@+id/txtFrequency"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Taxa de amostragem: 1000 Hz"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="15dp" />
+
+        <!-- GRÁFICO -->
+
+        <com.example.ib2_lab.GraphView
+            android:id="@+id/graphView"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Texto -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Alterar taxa de amostragem"
+            android:textSize="16sp"
+            android:layout_marginBottom="5dp" />
+
+        <!-- Campo + botão -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/editFrequency"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Frequência"
+                android:inputType="number"
+                android:text="1000"
+                tools:ignore="TouchTargetSizeCheck" />
+
+            <Button
+                android:id="@+id/btnApplyFrequency"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="Aplicar" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>
