@@ -1,6 +1,8 @@
 package com.example.ib2_lab
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -9,18 +11,19 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
+import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
 
-    // ==========================================
-    // IP DO ESP32
-    // ==========================================
+    // ==================================================
+    // ESP32
+    // ================================================ ==
 
     private val esp32IP = "192.168.4.1"
 
-    // ==========================================
-    // COMPONENTES DA TELA
-    // ==========================================
+    // ==================================================
+    // COMPONENTES
+    // ==================================================
 
     private lateinit var txtVoltage: TextView
     private lateinit var txtADC: TextView
@@ -32,73 +35,105 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var graphView: GraphView
 
-    // ==========================================
-    // DADOS DO GRÁFICO
-    // ==========================================
+    // ==================================================
+    // AMOSTRAS DO GRÁFICO
+    // ==================================================
 
-    private val samples = mutableListOf<Float>()
+    private val samples =
+        mutableListOf<Float>()
 
-    // ==========================================
-    // CICLO DE ATUALIZAÇÃO
-    // ==========================================
+    // ==================================================
+    // HANDLER
+    // ==================================================
 
-    private val updateRunnable = object : Runnable {
+    private val handler =
+        Handler(Looper.getMainLooper())
 
-        override fun run() {
+    // Evita várias requisições simultâneas
+    @Volatile
+    private var requestRunning = false
 
-            getData()
+    // ==================================================
+    // ATUALIZAÇÃO
+    // ==================================================
 
-            android.os.Handler(
-                mainLooper
-            ).postDelayed(
-                this,
-                100
-            )
+    private val updateRunnable =
+        object : Runnable {
+
+            override fun run() {
+
+                if (!requestRunning) {
+
+                    requestRunning = true
+
+                    getSamples()
+                }
+
+                handler.postDelayed(
+                    this,
+                    100
+                )
+            }
         }
-    }
 
-    // ==========================================
+    // ==================================================
     // ON CREATE
-    // ==========================================
+    // ==================================================
 
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
 
-        super.onCreate(savedInstanceState)
+        super.onCreate(
+            savedInstanceState
+        )
 
         setContentView(
             R.layout.activity_main
         )
 
-        // ======================================
-        // LIGA COMPONENTES DO XML
-        // ======================================
+        // ==================================================
+        // COMPONENTES
+        // ==================================================
 
         txtVoltage =
-            findViewById(R.id.txtVoltage)
+            findViewById(
+                R.id.txtVoltage
+            )
 
         txtADC =
-            findViewById(R.id.txtADC)
+            findViewById(
+                R.id.txtADC
+            )
 
         txtFrequency =
-            findViewById(R.id.txtFrequency)
+            findViewById(
+                R.id.txtFrequency
+            )
 
         txtStatus =
-            findViewById(R.id.txtStatus)
+            findViewById(
+                R.id.txtStatus
+            )
 
         editFrequency =
-            findViewById(R.id.editFrequency)
+            findViewById(
+                R.id.editFrequency
+            )
 
         btnApplyFrequency =
-            findViewById(R.id.btnApplyFrequency)
+            findViewById(
+                R.id.btnApplyFrequency
+            )
 
         graphView =
-            findViewById(R.id.graphView)
+            findViewById(
+                R.id.graphView
+            )
 
-        // ======================================
-        // BOTÃO DE FREQUÊNCIA
-        // ======================================
+        // ==================================================
+        // BOTÃO FREQUÊNCIA
+        // ==================================================
 
         btnApplyFrequency.setOnClickListener {
 
@@ -112,7 +147,9 @@ class MainActivity : AppCompatActivity() {
                 frequency in 10..3000
             ) {
 
-                setFrequency(frequency)
+                setFrequency(
+                    frequency
+                )
 
             } else {
 
@@ -121,81 +158,115 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ======================================
-        // COMEÇA ATUALIZAÇÃO
-        // ======================================
+        // ==================================================
+        // INICIA AQUISIÇÃO
+        // ==================================================
 
-        android.os.Handler(
-            mainLooper
-        ).post(updateRunnable)
+        handler.post(
+            updateRunnable
+        )
     }
 
-    // ==========================================
-    // RECEBE DADOS DO ESP32
-    // ==========================================
+    // ==================================================
+    // RECEBE BLOCO DE AMOSTRAS
+    // ==================================================
 
-    private fun getData() {
+    private fun getSamples() {
 
         thread {
 
             try {
 
+                // Primeiro usamos 100 amostras.
                 val response =
                     httpGet(
-                        "http://$esp32IP/data"
+                        "http://$esp32IP/samples?count=100"
                     )
 
                 val json =
                     JSONObject(response)
 
-                val adc =
-                    json.getInt("adc")
-
-                val voltage =
-                    json.getDouble("voltage")
-
                 val frequency =
-                    json.getInt("frequency")
+                    json.getInt(
+                        "frequency"
+                    )
+
+                val jsonSamples =
+                    json.getJSONArray(
+                        "samples"
+                    )
+
+                val receivedSamples =
+                    mutableListOf<Float>()
+
+                for (
+                i in 0 until jsonSamples.length()
+                ) {
+
+                    receivedSamples.add(
+                        jsonSamples
+                            .getDouble(i)
+                            .toFloat()
+                    )
+                }
 
                 runOnUiThread {
 
-                    txtVoltage.text =
-                        String.format(
-                            "%.3f V",
-                            voltage
+                    requestRunning = false
+
+                    if (
+                        receivedSamples.isNotEmpty()
+                    ) {
+
+                        // Guarda as amostras
+                        samples.addAll(
+                            receivedSamples
                         )
 
-                    txtADC.text =
-                        "ADC: $adc"
+                        // Mantém no máximo 500 pontos
+                        while (
+                            samples.size > 500
+                        ) {
 
-                    txtFrequency.text =
-                        "Taxa de amostragem: $frequency Hz"
+                            samples.removeAt(0)
+                        }
 
-                    txtStatus.text =
-                        "ESP32 conectado"
+                        // Atualiza gráfico
+                        graphView.setValues(
+                            samples
+                        )
 
-                    // --------------------------------
-                    // Adiciona amostra ao gráfico
-                    // --------------------------------
+                        // Última amostra
+                        val lastVoltage =
+                            receivedSamples.last()
 
-                    samples.add(
-                        voltage.toFloat()
-                    )
+                        val lastAdc =
+                            (
+                                    lastVoltage / 3.3f * 4095f
+                                    ).toInt()
 
-                    // Mantém somente 200 pontos
-                    if (samples.size > 200) {
+                        txtVoltage.text =
+                            String.format(
+                                "%.3f V",
+                                lastVoltage
+                            )
 
-                        samples.removeAt(0)
+                        txtADC.text =
+                            "ADC: $lastAdc"
+
+                        txtFrequency.text =
+                            "Taxa de amostragem: $frequency Hz"
+
+                        txtStatus.text =
+                            "ESP32 conectado"
                     }
-
-                    graphView.setValues(
-                        samples
-                    )
                 }
 
             } catch (e: Exception) {
 
                 runOnUiThread {
+
+                    requestRunning = false
 
                     txtStatus.text =
                         "ESP32 desconectado"
@@ -204,9 +275,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ==========================================
-    // ALTERA FREQUÊNCIA NO ESP32
-    // ==========================================
+    // ==================================================
+    // ALTERA FREQUÊNCIA
+    // ==================================================
 
     private fun setFrequency(
         frequency: Int
@@ -224,6 +295,14 @@ class MainActivity : AppCompatActivity() {
 
                     txtStatus.text =
                         "Frequência alterada para $frequency Hz"
+
+                    // Limpa o gráfico para começar
+                    // a nova taxa de aquisição
+                    samples.clear()
+
+                    graphView.setValues(
+                        samples
+                    )
                 }
 
             } catch (e: Exception) {
@@ -237,9 +316,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ==========================================
-    // REQUISIÇÃO HTTP
-    // ==========================================
+    // ==================================================
+    // HTTP GET
+    // ==================================================
 
     private fun httpGet(
         address: String
@@ -256,33 +335,48 @@ class MainActivity : AppCompatActivity() {
             "GET"
 
         connection.connectTimeout =
-            1000
+            2000
 
         connection.readTimeout =
-            1000
+            2000
 
         connection.connect()
 
-        return connection
-            .inputStream
-            .bufferedReader()
-            .use {
-                it.readText()
+        try {
+
+            if (
+                connection.responseCode !=
+                HttpURLConnection.HTTP_OK
+            ) {
+
+                throw Exception(
+                    "HTTP ${connection.responseCode}"
+                )
             }
+
+            return connection
+                .inputStream
+                .bufferedReader()
+                .use {
+                    it.readText()
+                }
+
+        } finally {
+
+            connection.disconnect()
+        }
     }
 
-    // ==========================================
-    // ENCERRA ATUALIZAÇÃO
-    // ==========================================
+    // ==================================================
+    // DESTRUIÇÃO
+    // ==================================================
 
     override fun onDestroy() {
 
-        super.onDestroy()
-
-        android.os.Handler(
-            mainLooper
-        ).removeCallbacks(
+        handler.removeCallbacks(
             updateRunnable
         )
+
+        super.onDestroy()
     }
 }
